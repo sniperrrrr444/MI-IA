@@ -3,6 +3,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from .config import MODEL_PATH, MAX_NEW_TOKENS, TEMPERATURE
 from .device import detect_device, recommended_dtype
+from .cache import KVCache
 
 @dataclass
 class RuntimeStatus:
@@ -15,7 +16,7 @@ class LocalRuntime:
     def __init__(self):
         d=detect_device()
         self.device=d["type"]; self.device_name=d["name"]
-        self.tokenizer=None; self.model=None
+        self.tokenizer=None; self.model=None; self.kv_cache=KVCache()
 
     def status(self):
         return RuntimeStatus(bool(self.model),MODEL_PATH,self.device,self.device_name)
@@ -46,6 +47,7 @@ class LocalRuntime:
                 top_k=40,use_cache=True,pad_token_id=self.tokenizer.eos_token_id
             )
         generated=output[0][inputs["input_ids"].shape[-1]:]
+        self.kv_cache.set(True)
         return self.tokenizer.decode(generated,skip_special_tokens=True).strip()
 
     def stream(self,messages,max_new_tokens=MAX_NEW_TOKENS,temperature=TEMPERATURE):
