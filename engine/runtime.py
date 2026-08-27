@@ -1,67 +1,54 @@
 from dataclasses import dataclass
-from typing import Iterator
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
 from .config import MODEL_PATH, MAX_NEW_TOKENS, TEMPERATURE
+from .device import detect_device, recommended_dtype
 
 @dataclass
 class RuntimeStatus:
     loaded: bool
     model_path: str
     device: str
+    device_name: str
 
 class LocalRuntime:
     def __init__(self):
-        self.tokenizer = None
-        self.model = None
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        d=detect_device()
+        self.device=d["type"]; self.device_name=d["name"]
+        self.tokenizer=None; self.model=None
 
-    def status(self) -> RuntimeStatus:
-        return RuntimeStatus(bool(self.model), MODEL_PATH, self.device)
+    def status(self):
+        return RuntimeStatus(bool(self.model),MODEL_PATH,self.device,self.device_name)
 
-    def load(self) -> RuntimeStatus:
-        if not MODEL_PATH:
-            raise RuntimeError("MIIA_MODEL_PATH is not configured.")
-        self.tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
-        dtype = torch.float16 if self.device == "cuda" else torch.float32
-        self.model = AutoModelForCausalLM.from_pretrained(
-            MODEL_PATH,
-            local_files_only=True,
-            torch_dtype=dtype,
-        )
-        self.model.to(self.device)
+    def load(self):
+        if not MODEL_PATH: raise RuntimeError("MIIA_MODEL_PATH is not configured.")
+        self.tokenizer=AutoTokenizer.from_pretrained(MODEL_PATH,local_files_only=True)
+        self.model=AutoModelForCausalLM.from_pretrained(
+            MODEL_PATH,local_files_only=True,
+            torch_dtype=recommended_dtype(self.device)
+        ).to(self.device)
         self.model.eval()
         return self.status()
 
-    def generate(self, messages: list[dict], max_new_tokens: int = MAX_NEW_TOKENS,
-                 temperature: float = TEMPERATURE) -> str:
-        if self.model is None:
-            self.load()
+    def _format(self,messages):
+        if hasattr(self.tokenizer,"apply_chat_template"):
+            try: return self.tokenizer.apply_chat_template(messages,tokenize=False,add_generation_prompt=True)
+            except Exception: pass
+        return "\n".join(f"{m.get('role','user').upper()}: {m.get('content','')}" for m in messages)+"\nASSISTANT:"
 
-        prompt = self._format_messages(messages)
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-
+    def generate(self,messages,max_new_tokens=MAX_NEW_TOKENS,temperature=TEMPERATURE):
+        if self.model is None: self.load()
+        inputs=self.tokenizer(self._format(messages),return_tensors="pt").to(self.device)
         with torch.inference_mode():
-            output = self.model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=temperature > 0,
-                temperature=max(temperature, 1e-5),
-                pad_token_id=self.tokenizer.eos_token_id,
+            output=self.model.generate(
+                **inputs,max_new_tokens=max_new_tokens,
+                do_sample=temperature>0,temperature=max(temperature,1e-5),
+                top_k=40,use_cache=True,pad_token_id=self.tokenizer.eos_token_id
             )
+        generated=output[0][inputs["input_ids"].shape[-1]:]
+        return self.tokenizer.decode(generated,skip_special_tokens=True).strip()
 
-        generated = output[0][inputs["input_ids"].shape[-1]:]
-        return self.tokenizer.decode(generated, skip_special_tokens=True).strip()
-
-    def _format_messages(self, messages: list[dict]) -> str:
-        if hasattr(self.tokenizer, "apply_chat_template"):
-            try:
-                return self.tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
-                )
-            except Exception:
-                pass
-        return "\n".join(
-            f"{m.get('role','user').upper()}: {m.get('content','')}" for m in messages
-        ) + "\nASSISTANT:"
+    def stream(self,messages,max_new_tokens=MAX_NEW_TOKENS,temperature=TEMPERATURE):
+        answer=self.generate(messages,max_new_tokens,temperature)
+        for chunk in answer.split():
+            yield chunk+" "
