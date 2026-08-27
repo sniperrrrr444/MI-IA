@@ -5,3 +5,7 @@ transformers
 torch
 safetensors
 sentencepiece
+peft
+trl
+accelerate
+python-dotenv
