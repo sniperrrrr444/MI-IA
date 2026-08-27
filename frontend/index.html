@@ -1,107 +1,42 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MI-IA</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: #0b1020;
-      color: #f5f7ff;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-    }
-    main { width: min(900px, 100%); padding: 24px; }
-    h1 { margin-bottom: 4px; }
-    #status { opacity: .65; margin-bottom: 20px; }
-    #chat {
-      min-height: 55vh;
-      padding: 16px;
-      border: 1px solid #29314a;
-      border-radius: 16px;
-      background: #11182b;
-      overflow-y: auto;
-    }
-    .message {
-      max-width: 85%;
-      padding: 12px 14px;
-      margin: 10px 0;
-      border-radius: 14px;
-      white-space: pre-wrap;
-    }
-    .user { margin-left: auto; background: #27365c; }
-    .assistant { background: #1b243b; }
-    form { display: flex; gap: 10px; margin-top: 14px; }
-    input {
-      flex: 1;
-      padding: 14px;
-      border-radius: 12px;
-      border: 1px solid #29314a;
-      background: #11182b;
-      color: inherit;
-    }
-    button {
-      padding: 0 20px;
-      border: 0;
-      border-radius: 12px;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0d12">
+<link rel="manifest" href="manifest.json">
+<title>MI-IA</title>
+<style>
+:root{font-family:Inter,system-ui,sans-serif;color:#f4f5f7;background:#0b0d12}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#171b28,#0b0d12 55%)}
+.app{width:min(920px,100%);margin:auto;min-height:100vh;display:flex;flex-direction:column;padding:18px}
+header{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 18px}
+.brand{font-weight:800;font-size:24px}.badge{font-size:12px;opacity:.7;border:1px solid #303645;padding:6px 9px;border-radius:99px}
+#status{font-size:13px;opacity:.7;margin-bottom:10px}
+#chat{flex:1;min-height:62vh;overflow:auto;padding:8px 0 90px}
+.msg{max-width:82%;padding:13px 15px;margin:12px 0;border-radius:17px;white-space:pre-wrap;line-height:1.5;overflow-wrap:anywhere}
+.user{margin-left:auto;background:#29334d}.assistant{background:#171c27;border:1px solid #282e3c}
+form{position:sticky;bottom:12px;display:flex;gap:9px;padding:10px;background:#11151eeb;border:1px solid #2a3040;border-radius:18px;backdrop-filter:blur(12px)}
+input{min-width:0;flex:1;background:transparent;border:0;outline:0;color:inherit;font-size:16px;padding:10px}
+button{border:0;border-radius:13px;padding:0 18px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5}
+.actions{display:flex;gap:8px}.small{background:transparent;color:inherit;border:1px solid #303645;padding:7px 10px}
+@media(max-width:600px){.app{padding:12px}.msg{max-width:92%}form{bottom:6px}}
+</style>
 </head>
-<body>
-<main>
-  <h1>MI-IA</h1>
-  <div id="status">Personal AI assistant · v0.1</div>
-  <section id="chat"></section>
-  <form id="form">
-    <input id="input" autocomplete="off" placeholder="Escribe un mensaje..." />
-    <button>Enviar</button>
-  </form>
-</main>
-
+<body><div class="app">
+<header><div class="brand">MI-IA</div><div class="actions"><button class="small" id="clear">Nueva</button><span class="badge">LOCAL</span></div></header>
+<div id="status">Comprobando motor local…</div>
+<section id="chat"></section>
+<form id="form"><input id="input" autocomplete="off" placeholder="Habla con MI-IA…" aria-label="Mensaje"><button id="send">Enviar</button></form>
+</div>
 <script>
-  const chat = document.getElementById("chat");
-  const input = document.getElementById("input");
-  const form = document.getElementById("form");
-  const history = [];
-
-  function addMessage(role, content) {
-    const el = document.createElement("div");
-    el.className = "message " + role;
-    el.textContent = content;
-    chat.appendChild(el);
-    chat.scrollTop = chat.scrollHeight;
-  }
-
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const message = input.value.trim();
-    if (!message) return;
-
-    addMessage("user", message);
-    input.value = "";
-
-    try {
-      const response = await fetch("http://127.0.0.1:8000/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history })
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Error desconocido");
-
-      addMessage("assistant", data.response);
-      history.push({ role: "user", content: message });
-      history.push({ role: "assistant", content: data.response });
-    } catch (error) {
-      addMessage("assistant", "Error: " + error.message);
-    }
-  });
-</script>
-</body>
-</html>
+const API="http://127.0.0.1:8000", chat=document.querySelector("#chat"),input=document.querySelector("#input"),form=document.querySelector("#form"),send=document.querySelector("#send"),status=document.querySelector("#status");
+let history=JSON.parse(localStorage.getItem("miia-history")||"[]");
+function render(){chat.innerHTML="";history.forEach(m=>add(m.role,m.content,false));}
+function add(role,text,save=true){const el=document.createElement("div");el.className="msg "+role;el.textContent=text;chat.appendChild(el);chat.scrollTop=chat.scrollHeight;if(save){localStorage.setItem("miia-history",JSON.stringify(history));}}
+async function health(){try{const r=await fetch(API+"/api/health");const d=await r.json();status.textContent=d.local_engine?"Motor local conectado · "+d.model:"Motor local no disponible · inicia Ollama";}catch{status.textContent="Backend local no disponible · ejecuta MI-IA";}}
+form.addEventListener("submit",async e=>{e.preventDefault();const message=input.value.trim();if(!message)return;history.push({role:"user",content:message});add("user",message);input.value="";send.disabled=true;add("assistant","Pensando…",false);const thinking=chat.lastChild;try{const r=await fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,history:history.slice(0,-1)})});const d=await r.json();if(!r.ok)throw Error(d.detail||"Error");thinking.textContent=d.response;history.push({role:"assistant",content:d.response});localStorage.setItem("miia-history",JSON.stringify(history));}catch(err){thinking.textContent="No puedo conectar con la IA local. "+err.message;}finally{send.disabled=false;input.focus();}});
+document.querySelector("#clear").onclick=()=>{history=[];localStorage.removeItem("miia-history");render();};
+render();health();if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script></body></html>
