@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MI-IA</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #0b1020;
+      color: #f5f7ff;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+    main { width: min(900px, 100%); padding: 24px; }
+    h1 { margin-bottom: 4px; }
+    #status { opacity: .65; margin-bottom: 20px; }
+    #chat {
+      min-height: 55vh;
+      padding: 16px;
+      border: 1px solid #29314a;
+      border-radius: 16px;
+      background: #11182b;
+      overflow-y: auto;
+    }
+    .message {
+      max-width: 85%;
+      padding: 12px 14px;
+      margin: 10px 0;
+      border-radius: 14px;
+      white-space: pre-wrap;
+    }
+    .user { margin-left: auto; background: #27365c; }
+    .assistant { background: #1b243b; }
+    form { display: flex; gap: 10px; margin-top: 14px; }
+    input {
+      flex: 1;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid #29314a;
+      background: #11182b;
+      color: inherit;
+    }
+    button {
+      padding: 0 20px;
+      border: 0;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>MI-IA</h1>
+  <div id="status">Personal AI assistant · v0.1</div>
+  <section id="chat"></section>
+  <form id="form">
+    <input id="input" autocomplete="off" placeholder="Escribe un mensaje..." />
+    <button>Enviar</button>
+  </form>
+</main>
+
+<script>
+  const chat = document.getElementById("chat");
+  const input = document.getElementById("input");
+  const form = document.getElementById("form");
+  const history = [];
+
+  function addMessage(role, content) {
+    const el = document.createElement("div");
+    el.className = "message " + role;
+    el.textContent = content;
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessage("user", message);
+    input.value = "";
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, history })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Error desconocido");
+
+      addMessage("assistant", data.response);
+      history.push({ role: "user", content: message });
+      history.push({ role: "assistant", content: data.response });
+    } catch (error) {
+      addMessage("assistant", "Error: " + error.message);
+    }
+  });
+</script>
+</body>
+</html>
