@@ -1,108 +1,66 @@
 # MI-IA
 
-**MI-IA es un asistente de IA local y privado.** El modelo se ejecuta en el propio dispositivo.
+**MI-IA es un asistente de IA local y privado con su propio motor de inferencia experimental.**
 
-## Qué incluye
+## Componentes
 
-- Interfaz de chat responsive.
-- Historial persistente en almacenamiento local del navegador.
-- Backend FastAPI local.
-- Motor de inferencia local compatible con OpenAI.
-- Ollama como configuración predeterminada.
-- PWA instalable como aplicación.
-- Sin API key de nube.
-- Preparado para añadir memoria, voz, visión, archivos y herramientas.
+- **MI-IA App:** interfaz, memoria y herramientas.
+- **MI-IA Engine:** runtime local que carga directamente un modelo desde disco.
+- **Cerebro:** memoria local + dataset de entrenamiento.
+- **PWA:** interfaz instalable.
 
-## Arquitectura
+## Motor propio
 
-```
-MI-IA/
-├── backend/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── config.py
-│   └── requirements.txt
-├── frontend/
-│   ├── index.html
-│   ├── manifest.json
-│   └── sw.js
-├── .env.example
-└── README.md
-```
+MI-IA ya no depende de Ollama. El backend se conecta por defecto a:
 
-## Ejecutarlo
+`http://127.0.0.1:8080/v1`
 
-### 1. Instala un motor local
+El motor está en `engine/` y utiliza PyTorch + Transformers en esta primera etapa. Esto nos da una base real sobre la que desarrollar nuestro propio runtime.
 
-Con Ollama, instala el programa en el dispositivo y descarga un modelo:
+Consulta [ENGINE.md](ENGINE.md) y [engine/README.md](engine/README.md).
+
+## Ejecutar
+
+### Motor
 
 ```bash
-ollama pull llama3.2:3b
-ollama serve
+pip install -r engine/requirements.txt
 ```
 
-### 2. Instala MI-IA
+Configura `MIIA_MODEL_PATH` en `.env` apuntando a un modelo local compatible y ejecuta:
 
 ```bash
-python -m venv .venv
+python -m engine.server
 ```
 
-Linux/macOS:
+### Aplicación
 
-```bash
-source .venv/bin/activate
-```
-
-Windows:
-
-```powershell
-.venv\\Scripts\\Activate.ps1
-```
-
-Instala dependencias:
+En otra terminal:
 
 ```bash
 pip install -r backend/requirements.txt
-```
-
-### 3. Arranca MI-IA
-
-```bash
 uvicorn backend.main:app --reload
 ```
 
-Abre `frontend/index.html` en el navegador.
-
-## Configuración
-
-Copia `.env.example` a `.env` para cambiar el modelo o endpoint.
-
-Por defecto:
-
-```text
-AI_BASE_URL=http://127.0.0.1:11434/v1
-AI_MODEL=llama3.2:3b
-```
-
-Puedes cambiar `AI_MODEL` por cualquier modelo local compatible con tu motor.
+Abre `frontend/index.html`.
 
 ## Privacidad
 
-Por defecto, MI-IA conecta únicamente con `127.0.0.1`. Las conversaciones no se envían a una API de IA externa.
+Por defecto todo funciona sobre `127.0.0.1`. El motor no descarga modelos automáticamente ni necesita una API de nube.
 
-Si cambias manualmente `AI_BASE_URL` a un servidor remoto, ese servidor podrá recibir los mensajes.
+## Roadmap del motor
+
+- [x] API local propia
+- [x] Carga directa de modelos
+- [x] Inferencia CPU/GPU básica
+- [ ] Streaming de tokens
+- [ ] KV cache optimizada
+- [ ] Cuantización
+- [ ] Scheduler de inferencia
+- [ ] Backend nativo C/C++
+- [ ] Fine-tuning local integrado
+- [ ] Gestor de modelos
 
 ## Estado
 
-**v0.2 — Local-first foundation**
-
-## Próximamente
-
-- Streaming de respuestas.
-- Memoria semántica local.
-- Gestor de modelos.
-- Adjuntar y analizar archivos.
-- Entrada y salida por voz.
-- Modelos de visión.
-- Herramientas locales.
-- Empaquetado nativo para Windows/Linux/Android.
+**v0.3 — MI-IA Engine foundation**
